@@ -1,11 +1,13 @@
-
 import React, { useEffect, useState } from 'react';
-import { Table, notification, Popconfirm } from 'antd';
+import { Table, notification, Popconfirm, Modal, Form, Input, Dropdown, Menu } from 'antd';
 import axios from 'axios';
 
 const UserTable = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedUser , setSelectedUser ] = useState(null);
+    const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+    const [form] = Form.useForm();
 
     useEffect(() => {
         fetchUsers();
@@ -45,6 +47,39 @@ const UserTable = () => {
         }
     };
 
+    const showEditModal = (user) => {
+        setSelectedUser (user);
+        form.setFieldsValue({ first_name: user.first_name, last_name: user.last_name });
+        setIsEditModalVisible(true);
+    };
+
+    const handleEditUser  = async () => {
+        const values = await form.validateFields();
+        try {
+           
+            setUsers(users.map(user => user.id === selectedUser .id ? { ...user, ...values } : user));
+            notification.success({
+                message: 'Редактирование пользователя',
+                description: `Пользователь ${selectedUser .first_name} ${selectedUser .last_name} обновлен`,
+            });
+            setIsEditModalVisible(false);
+        } catch (error) {
+            notification.error({
+                message: 'Ошибка редактирования пользователя',
+                description: 'Не удалось обновить данные пользователя. Попробуйте еще раз.',
+            });
+        }
+    };
+
+    const handleMenuClick = (e) => {
+        const { key } = e;
+        if (key === 'edit') {
+            showEditModal(selectedUser );
+        } else if (key === 'delete') {
+            deleteUser (selectedUser .id, selectedUser .first_name, selectedUser .last_name);
+        }
+    };
+
     const columns = [
         {
             title: 'ID',
@@ -68,28 +103,60 @@ const UserTable = () => {
         },
         {
             title: 'Действие',
-            render: (text, record) => (
-                <Popconfirm
-                    title="Вы уверены, что хотите удалить этого пользователя?"
-                    onConfirm={() => deleteUser (record.id, record.first_name, record.last_name)}
-                    okText="Да"
-                    cancelText="Нет"
-                >
-                    <a href="#">Удалить</a>
-                </Popconfirm>
-            ),
+            render: (text, record) => {
+                const menu = (
+                    <Menu onClick={handleMenuClick}>
+                        <Menu.Item key="edit">Редактировать</Menu.Item>
+                        <Menu.Item key="delete">Удалить</Menu.Item>
+                    </Menu>
+                );
+
+                return (
+                    <Dropdown overlay={menu} trigger={['click']}>
+                        <a onClick={e => e.preventDefault()}>Действия</a>
+                    </Dropdown>
+                );
+            },
         },
     ];
 
     return (
-        <Table
-            columns={columns}
-            dataSource={users}
-            loading={loading}
-            rowKey="id"
-            pagination={{ pageSize: 3 }}
-        />
+        <div>
+            <Table
+                columns={columns}
+                dataSource={users}
+                loading={loading}
+                rowKey="id"
+                pagination={{ pageSize: 3 }}
+                onRow={(record) => ({
+                    onClick: () => setSelectedUser (record), // Устанавливаем выбранного пользователя при клике на строку
+                })}
+            />
+            <Modal
+                title="Редактировать пользователя"
+                visible={isEditModalVisible}
+                onOk={handleEditUser }
+                onCancel={() => setIsEditModalVisible(false)}
+            >
+                <Form form={form} layout="vertical">
+                    <Form.Item
+                        name="first_name"
+                        label="Имя"
+                        rules={[{ required: true, message: 'Пожалуйста, введите имя!' }]}
+                    >
+                        <Input />
+                    </Form.Item>
+                    <Form.Item
+                        name="last_name"
+                        label="Фамилия"
+                        rules={[{ required: true, message: 'Пожалуйста, введите фамилию!' }]}
+                    >
+                        <Input />
+                    </Form.Item>
+                </Form>
+            </Modal>
+        </div>
     );
 };
 
-export {UserTable};
+export { UserTable };
